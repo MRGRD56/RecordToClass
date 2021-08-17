@@ -66,10 +66,13 @@ namespace RecordToClass.Models
             return str;
         }
         
-        public string ToClassString(PropertyType propertiesType = PropertyType.Get, bool useThisInConstructor = false)
+        public string ToClassString(
+            PropertyType propertiesType = PropertyType.Get, 
+            bool useThisKeyword = false,
+            bool createDeconstructor = true)
         {
             var propertyEnding = PropertyTypes[propertiesType];
-            var thisKeyword = useThisInConstructor ? "this." : "";
+            var thisKeyword = useThisKeyword ? "this." : "";
             
             var str = $"{Modifiers} class {Name}{(!string.IsNullOrWhiteSpace(InheritedTypes) ? $" : {InheritedTypes}" : "")}\n{{\n    ";
 
@@ -97,6 +100,17 @@ namespace RecordToClass.Models
             if (!string.IsNullOrWhiteSpace(Body))
             {
                 str += "\n\n    " + Body.TrimEnd();
+            }
+
+            if (createDeconstructor && Members?.Any() == true)
+            {
+                str += $"\n\n    public void Deconstruct({string.Join(", ", Members.Select(m => $"out {m.Type} {ToCamelCase(m.Name)}"))})\n    {{\n";
+                foreach (var member in Members)
+                {
+                    str += $"        {ToCamelCase(member.Name)} = {thisKeyword}{member.Name};\n";
+                }
+
+                str += "    }";
             }
 
             str += "\n}";
