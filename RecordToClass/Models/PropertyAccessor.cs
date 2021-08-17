@@ -1,11 +1,10 @@
 ﻿namespace RecordToClass.Models
 {
-    public enum PropertyType
+    public enum PropertyAccessor
     {
         GetSet,
         Get,
         Set,
-        GetInit,
-        Field
+        GetInit
     }
 }

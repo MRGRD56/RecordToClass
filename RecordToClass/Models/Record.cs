@@ -1,131 +1,155 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using RecordToClass.Extensions;
 
 namespace RecordToClass.Models
 {
     public record Record(
-        string Modifiers,
-        string Name,
-        IEnumerable<RecordMember> Members,
-        string Body,
-        string InheritedTypes)
+        SyntaxTree SyntaxTree)
     {
         public static Record Parse(string recordString)
         {
-            //GROUPS
-            //1: Modifiers?
-            //2: Name
-            //4: Members? (primary constructor)
-            //6: Inherited types?
-            //8: Body?
-            var match = Regex.Match(recordString, 
-                @"^([a-z\s]*\s+)?record\s+([a-zA-Z0-9_@]+)\s*(\(\s*(.*)\s*\))?\s*(\:\s*([a-zA-Z @\,\.]*))?\s*;?\s*(\{\s*(.*)\s*\})?$", 
-                RegexOptions.Singleline);
-            var modifiers = match.Groups[1].Value.Trim();
-            var name = match.Groups[2].Value;
-            var membersString = match.Groups[4].Value;
-            var inheritedTypes = match.Groups[6].Value;
-            var body = match.Groups[8].Value;
-
-            var members = RecordMember.ParseList(membersString);
-            return new Record(modifiers, name, members, body, inheritedTypes);
+            return new Record(CSharpSyntaxTree.ParseText(recordString));
         }
-        
+
         public string ToRecordString()
         {
-            var str = $"{Modifiers} record {Name}";
-            if (Members?.Any() == true)
-            {
-                var membersString = Members.ToRecordMembersString().Replace("\r\n", "\n").Replace("\n", "\n    ");
-                if (!membersString.StartsWith("    "))
-                {
-                    membersString = "    " + membersString;
-                }
-                str += $"(\n{membersString})";
-            }
-
-            str += $"{(!string.IsNullOrWhiteSpace(InheritedTypes) ? $" : {InheritedTypes}" : "")}";
-
-            if (!string.IsNullOrWhiteSpace(Body))
-            {
-                var bodyString = Body;
-                if (!bodyString.StartsWith("    "))
-                {
-                    bodyString = "    " + bodyString;
-                }
-                if (!bodyString.EndsWith("\n"))
-                {
-                    bodyString += "\n";
-                }
-                str += $"\n{{\n{bodyString}}}";
-            }
-
-            return str;
+            return SyntaxTree.GetRoot().Format().ToString();
         }
-        
+
         public string ToClassString(
-            PropertyType propertiesType = PropertyType.Get, 
+            PropertyAccessor propertiesAccessor = PropertyAccessor.Get,
             bool useThisKeyword = false,
             bool createDeconstructor = true)
         {
-            var propertyEnding = PropertyTypes[propertiesType];
             var thisKeyword = useThisKeyword ? "this." : "";
-            
-            var str = $"{Modifiers} class {Name}{(!string.IsNullOrWhiteSpace(InheritedTypes) ? $" : {InheritedTypes}" : "")}\n{{\n    ";
+            var propertiesAccessors = PropertyAccessorsDictionary[propertiesAccessor];
 
-            if (Members?.Any() == true)
+            var codeRoot = (CompilationUnitSyntax)SyntaxTree.GetRoot();
+            var recordElement = (RecordDeclarationSyntax)codeRoot.Members[0];
+            var modifiers = recordElement.Modifiers;
+            var baseList = recordElement.BaseList;
+            var name = recordElement.Identifier;
+            var parameters = recordElement.ParameterList;
+            var members = recordElement.Members;
+            var attributes = recordElement.AttributeLists;
+
+            var properties = parameters?.Parameters.Select(p =>
             {
-                foreach (var member in Members)
-                {
-                    var stringToAdd = $"{(!string.IsNullOrWhiteSpace(member.Attributes) ? $"{member.Attributes}\n" : "")}" +
-                                      $"public {member.Type} {member.Name}" +
-                                      $"{(!string.IsNullOrWhiteSpace(member.DefaultValue) ? $" = {member.DefaultValue}" : "")}{propertyEnding}\n";
+                return SyntaxFactory.PropertyDeclaration(
+                        p.Type,
+                        p.Identifier)
+                    .WithAttributeLists(p.AttributeLists)
+                    .AddModifiers(
+                        SyntaxFactory.Token(SyntaxKind.PublicKeyword))
+                    .AddAccessorListAccessors(propertiesAccessors);
+            }).ToArray();
 
-                    str += stringToAdd.Replace("\n\r", "\n").Replace("\n", "\n    ");
-                }
-            
-                str += $"\n    public {Name}({string.Join(", ", Members.Select(m => $"{m.Type} {ToCamelCase(m.Name)}"))})\n    {{\n";
-            
-                foreach (var member in Members)
-                {
-                    str += $"        {thisKeyword}{member.Name} = {ToCamelCase(member.Name)};\n";
-                }
+            var classRootElement = SyntaxFactory.CompilationUnit();
 
-                str += "    }";
+            var classElement = SyntaxFactory.ClassDeclaration(name)
+                .WithAttributeLists(attributes)
+                .WithBaseList(baseList)
+                .WithModifiers(modifiers);
+
+            if (properties?.Any() == true)
+            {
+                classElement = classElement.AddMembers(properties);
             }
 
-            if (!string.IsNullOrWhiteSpace(Body))
+            var classElementProperties = classElement.Members
+                .OfType<PropertyDeclarationSyntax>()
+                .ToArray();
+
+
+            if (properties?.Any() == true)
             {
-                str += "\n\n    " + Body.TrimEnd();
+                var constructorParameters = classElementProperties
+                    .Select(p =>
+                    {
+                        return SyntaxFactory.Parameter(SyntaxFactory.Identifier(ToCamelCase(p.Identifier.Text)))
+                            .WithType(p.Type);
+                    })
+                    .ToArray();
+
+                var constructorStatements = classElementProperties
+                    .Select(p =>
+                    {
+                        var operandsName = (Left: p.Identifier.Text, Right: ToCamelCase(p.Identifier.Text));
+                        var @this = operandsName.Left == operandsName.Right ? "this." : thisKeyword;
+                        return SyntaxFactory.ExpressionStatement(
+                            SyntaxFactory.AssignmentExpression(
+                                SyntaxKind.SimpleAssignmentExpression,
+                                SyntaxFactory.IdentifierName(@this + operandsName.Left),
+                                SyntaxFactory.IdentifierName(operandsName.Right)));
+                    })
+                    .ToArray();
+
+                classElement = classElement
+                    .AddMembers(
+                        SyntaxFactory.ConstructorDeclaration(name)
+                            .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
+                            .AddParameterListParameters(constructorParameters)
+                            .WithBody(SyntaxFactory.Block(constructorStatements)));
             }
 
-            if (createDeconstructor && Members?.Any() == true)
-            {
-                str += $"\n\n    public void Deconstruct({string.Join(", ", Members.Select(m => $"out {m.Type} {ToCamelCase(m.Name)}"))})\n    {{\n";
-                foreach (var member in Members)
-                {
-                    str += $"        {ToCamelCase(member.Name)} = {thisKeyword}{member.Name};\n";
-                }
+            classElement = classElement.AddMembers(members.ToArray());
 
-                str += "    }";
-            }
+            classRootElement = classRootElement.AddMembers(classElement);
 
-            str += "\n}";
-            return str;
+            var workspace = new AdhocWorkspace();
+            workspace.AddSolution(
+                SolutionInfo.Create(SolutionId.CreateNewId("formatter"),
+                    VersionStamp.Default)
+            );
+
+            return classRootElement.Format().ToString();
         }
 
         public override string ToString() => ToRecordString();
 
-        private static readonly Dictionary<PropertyType, string> PropertyTypes = new()
+        private static AccessorDeclarationSyntax GetPropertyAccessor(SyntaxKind syntaxKind)
         {
-            { PropertyType.GetSet, " { get; set; }" },
-            { PropertyType.Get, " { get; }" },
-            { PropertyType.Set, " { set; }" },
-            { PropertyType.GetInit, " { get; init; }" },
-            { PropertyType.Field, ";" }
+            return SyntaxFactory.AccessorDeclaration(syntaxKind)
+                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+        }
+        
+        private static readonly Dictionary<PropertyAccessor, AccessorDeclarationSyntax[]> PropertyAccessorsDictionary = new()
+        {
+            {
+                PropertyAccessor.GetSet,
+                new[]
+                {
+                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
+                    GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
+                }
+            },
+            {
+                PropertyAccessor.Get,
+                new[]
+                {
+                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration)
+                }
+            },
+            {
+                PropertyAccessor.Set,
+                new[]
+                {
+                    GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
+                }
+            },
+            {
+                PropertyAccessor.GetInit,
+                new[]
+                {
+                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
+                    GetPropertyAccessor(SyntaxKind.InitAccessorDeclaration)
+                }
+            }
         };
 
         private static string ToCamelCase(string pascalCase)
