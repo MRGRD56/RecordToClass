@@ -10,25 +10,28 @@ namespace RecordToClass.Models
         string Modifiers,
         string Name,
         IEnumerable<RecordMember> Members,
-        string Body)
+        string Body,
+        string InheritedTypes)
     {
         public static Record Parse(string recordString)
         {
             //GROUPS
             //1: Modifiers?
             //2: Name
-            //4: Members (primary constructor)
-            //6: Body?
+            //4: Members? (primary constructor)
+            //6: Inherited types?
+            //8: Body?
             var match = Regex.Match(recordString, 
-                @"^([a-z\s]*\s+)?record\s+([a-zA-Z0-9_@]+)[\s]*(\(\s*(.*)\s*\))\s*;?\s*(\{\s*(.*)\s*\})?$", 
+                @"^([a-z\s]*\s+)?record\s+([a-zA-Z0-9_@]+)\s*(\(\s*(.*)\s*\))?\s*(\:\s*([a-zA-Z @\,\.]*))?\s*;?\s*(\{\s*(.*)\s*\})?$", 
                 RegexOptions.Singleline);
             var modifiers = match.Groups[1].Value.Trim();
             var name = match.Groups[2].Value;
             var membersString = match.Groups[4].Value;
-            var body = match.Groups[6].Value;
+            var inheritedTypes = match.Groups[6].Value;
+            var body = match.Groups[8].Value;
 
             var members = RecordMember.ParseList(membersString);
-            return new Record(modifiers, name, members, body);
+            return new Record(modifiers, name, members, body, inheritedTypes);
         }
         
         public string ToRecordString()
@@ -43,6 +46,8 @@ namespace RecordToClass.Models
                 }
                 str += $"(\n{membersString})";
             }
+
+            str += $"{(!string.IsNullOrWhiteSpace(InheritedTypes) ? $" : {InheritedTypes}" : "")}";
 
             if (!string.IsNullOrWhiteSpace(Body))
             {
@@ -66,7 +71,7 @@ namespace RecordToClass.Models
             var propertyEnding = PropertyTypes[propertiesType];
             var thisKeyword = useThisInConstructor ? "this." : "";
             
-            var str = $"{Modifiers} class {Name}\n{{\n    ";
+            var str = $"{Modifiers} class {Name}{(!string.IsNullOrWhiteSpace(InheritedTypes) ? $" : {InheritedTypes}" : "")}\n{{\n    ";
 
             if (Members?.Any() == true)
             {

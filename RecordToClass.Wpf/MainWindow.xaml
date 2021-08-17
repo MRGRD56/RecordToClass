@@ -1,0 +1,27 @@
+﻿<Window x:Class="RecordToClass.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:RecordToClass.Wpf"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Window.DataContext>
+        <local:MainWindowViewModel/>
+    </Window.DataContext>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        <Grid.Resources>
+            <Style TargetType="TextBox">
+                <Setter Property="AcceptsReturn" Value="True"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="FontFamily" Value="JetBrains Mono"/>
+            </Style>
+        </Grid.Resources>
+        <TextBox Grid.Column="0" Text="{Binding RecordText, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBox Grid.Column="1" Text="{Binding Result}" IsReadOnly="True"/>
+    </Grid>
+</Window>

@@ -1,8 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace RecordToClass.Records
 {
-    public record User(
+    public record User (
         System.Int32 Id,
         [Required(AllowEmptyStrings = false, ErrorMessage = "Specify the first name")] 
         string FirstName,
@@ -10,12 +11,15 @@ namespace RecordToClass.Records
         string LastName,
         [RegularExpression(@"^(?=.*[A-Za-zА-Яа-яЁё])(?=.*\d).{6,}$")]
         string Password,
-        bool IsDeleted = false)
+        bool IsDeleted = false) : IDisposable
     {
         public string GetFullName() => $"{FirstName} {LastName}";
         
         //Something {{}}}}}}}
         
         //blah blah blah
+        public void Dispose()
+        {
+        }
     }
 }

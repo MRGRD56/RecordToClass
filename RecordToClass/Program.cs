@@ -16,7 +16,7 @@ public record User(
     string LastName,
     [RegularExpression(@""^(?=.*[A-Za-zА-Яа-яЁё])(?=.*\d).{6,}$"")]
     string Password,
-    bool IsDeleted = false)
+    bool IsDeleted = false) : Person, IDeletable
 {
     public string GetFullName() => $""{FirstName} {LastName}"";
     

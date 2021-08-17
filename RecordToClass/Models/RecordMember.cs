@@ -23,7 +23,7 @@ namespace RecordToClass.Models
             //3: Name
             //5: Default Value?
             var matches = Regex.Matches(membersString, 
-                @"(\[.*?\])*\s*([a-zA-Z0-9_@\.]+)\s+([a-zA-Z0-9_@]+)(\s*=\s*([^\n]+))?\,",
+                @"(\[.*?\])*\s*([a-zA-Z0-9_@\.<>]+\??)\s+([a-zA-Z0-9_@]+)(\s*=\s*([^\n]+))?\,",
                 RegexOptions.Singleline);
 
             return matches
