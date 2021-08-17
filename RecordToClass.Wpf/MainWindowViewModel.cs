@@ -10,6 +10,8 @@ namespace RecordToClass.Wpf
     {
         private string _result;
         private string _recordText;
+        private bool _doUseThisKeyword;
+        private bool _doCreateDeconstructor = true;
         public event PropertyChangedEventHandler PropertyChanged;
 
         public string RecordText
@@ -26,7 +28,10 @@ namespace RecordToClass.Wpf
         {
             try
             {
-                Result = Record.Parse(RecordText).ToClassString();
+                Result = Record.Parse(RecordText)
+                    .ToClassString(
+                        useThisKeyword: DoUseThisKeyword, 
+                        createDeconstructor: DoCreateDeconstructor);
             }
             catch (Exception exception)
             {
@@ -42,6 +47,28 @@ namespace RecordToClass.Wpf
                 if (value == _result) return;
                 _result = value;
                 OnPropertyChanged();
+            }
+        }
+
+        public bool DoUseThisKeyword
+        {
+            get => _doUseThisKeyword;
+            set
+            {
+                if (value == _doUseThisKeyword) return;
+                _doUseThisKeyword = value;
+                UpdateResult();
+            }
+        }
+
+        public bool DoCreateDeconstructor
+        {
+            get => _doCreateDeconstructor;
+            set
+            {
+                if (value == _doCreateDeconstructor) return;
+                _doCreateDeconstructor = value;
+                UpdateResult();
             }
         }
 

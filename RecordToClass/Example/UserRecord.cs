@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using RecordToClass.Example;
 
 namespace RecordToClass.Records
 {
@@ -11,15 +12,12 @@ namespace RecordToClass.Records
         string LastName,
         [RegularExpression(@"^(?=.*[A-Za-zА-Яа-яЁё])(?=.*\d).{6,}$")]
         string Password,
-        bool IsDeleted = false) : IDisposable
+        bool IsDeleted = false) : IDeletable
     {
         public string GetFullName() => $"{FirstName} {LastName}";
         
         //Something {{}}}}}}}
         
         //blah blah blah
-        public void Dispose()
-        {
-        }
     }
 }
