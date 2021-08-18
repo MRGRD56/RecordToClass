@@ -10,4 +10,8 @@
       <ProjectReference Include="..\RecordToClass\RecordToClass.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="MgMvvmTools" Version="1.2.2" />
+    </ItemGroup>
+
 </Project>

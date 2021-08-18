@@ -8,20 +8,32 @@ using RecordToClass.Extensions;
 
 namespace RecordToClass.Models
 {
-    public record Record(
-        SyntaxTree SyntaxTree)
+    public class Record
     {
+        private SyntaxTree SyntaxTree { get; }
+
+        public Record(SyntaxTree syntaxTree)
+        {
+            SyntaxTree = syntaxTree;
+        }
+        
+        public RecordDeclarationSyntax Declaration
+        {
+            get
+            {
+                var codeRoot = (CompilationUnitSyntax)SyntaxTree.GetRoot();
+                var recordDeclaration = (RecordDeclarationSyntax)codeRoot.Members[0];
+                return recordDeclaration;
+            }
+        }
+        
         public static Record Parse(string recordString)
         {
-            return new Record(CSharpSyntaxTree.ParseText(recordString));
+            var syntaxTree = CSharpSyntaxTree.ParseText(recordString);
+            return new Record(syntaxTree);
         }
 
-        public string ToRecordString()
-        {
-            return SyntaxTree.GetRoot().Format().ToString();
-        }
-
-        public string ToClassString(
+        public ClassDeclarationSyntax ToClass(
             PropertyAccessor propertiesAccessor = PropertyAccessor.Get,
             bool useThisKeyword = false,
             bool createDeconstructor = true)
@@ -65,17 +77,17 @@ namespace RecordToClass.Models
                 .OfType<PropertyDeclarationSyntax>()
                 .ToArray();
 
+            var constructorParameters = parameters?.Parameters
+                .Select(p =>
+                {
+                    return SyntaxFactory.Parameter(SyntaxFactory.Identifier(ToCamelCase(p.Identifier.Text)))
+                        .WithType(p.Type)
+                        .WithDefault(p.Default);
+                })
+                .ToArray();
 
-            if (properties?.Any() == true)
+            if (constructorParameters?.Any() == true)
             {
-                var constructorParameters = classElementProperties
-                    .Select(p =>
-                    {
-                        return SyntaxFactory.Parameter(SyntaxFactory.Identifier(ToCamelCase(p.Identifier.Text)))
-                            .WithType(p.Type);
-                    })
-                    .ToArray();
-
                 var constructorStatements = classElementProperties
                     .Select(p =>
                     {
@@ -97,63 +109,89 @@ namespace RecordToClass.Models
                             .WithBody(SyntaxFactory.Block(constructorStatements)));
             }
 
+            if (createDeconstructor && constructorParameters?.Length >= 2)
+            {
+                var deconstructorParameters = constructorParameters
+                    .Select(p => p
+                        .AddModifiers(SyntaxFactory.Token(SyntaxKind.OutKeyword))
+                        .WithDefault(null))
+                    .ToArray();
+                
+                var deconstructorStatements = classElementProperties
+                    .Select(p =>
+                    {
+                        var operandsName = (Left: ToCamelCase(p.Identifier.Text), Right: p.Identifier.Text);
+                        var @this = operandsName.Left == operandsName.Right ? "this." : thisKeyword;
+                        return SyntaxFactory.ExpressionStatement(
+                            SyntaxFactory.AssignmentExpression(
+                                SyntaxKind.SimpleAssignmentExpression,
+                                SyntaxFactory.IdentifierName(operandsName.Left),
+                                SyntaxFactory.IdentifierName(@this + operandsName.Right)));
+                    })
+                    .ToArray();
+
+                classElement = classElement.AddMembers(
+                    SyntaxFactory.MethodDeclaration(
+                            SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
+                            "Deconstruct")
+                        .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
+                        .AddParameterListParameters(deconstructorParameters)
+                        .WithBody(SyntaxFactory.Block(deconstructorStatements)));
+            }
+
             classElement = classElement.AddMembers(members.ToArray());
 
             classRootElement = classRootElement.AddMembers(classElement);
 
-            var workspace = new AdhocWorkspace();
-            workspace.AddSolution(
-                SolutionInfo.Create(SolutionId.CreateNewId("formatter"),
-                    VersionStamp.Default)
-            );
-
-            return classRootElement.Format().ToString();
+            return classElement.Format();
         }
 
-        public override string ToString() => ToRecordString();
+        public override string ToString() => Declaration.Format().ToString();
 
         private static AccessorDeclarationSyntax GetPropertyAccessor(SyntaxKind syntaxKind)
         {
             return SyntaxFactory.AccessorDeclaration(syntaxKind)
                 .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
         }
-        
-        private static readonly Dictionary<PropertyAccessor, AccessorDeclarationSyntax[]> PropertyAccessorsDictionary = new()
-        {
+
+        private static readonly Dictionary<PropertyAccessor, AccessorDeclarationSyntax[]> PropertyAccessorsDictionary =
+            new()
             {
-                PropertyAccessor.GetSet,
-                new[]
                 {
-                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
-                    GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
-                }
-            },
-            {
-                PropertyAccessor.Get,
-                new[]
+                    PropertyAccessor.GetSet,
+                    new[]
+                    {
+                        GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
+                        GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
+                    }
+                },
                 {
-                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration)
-                }
-            },
-            {
-                PropertyAccessor.Set,
-                new[]
+                    PropertyAccessor.Get,
+                    new[]
+                    {
+                        GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration)
+                    }
+                },
                 {
-                    GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
-                }
-            },
-            {
-                PropertyAccessor.GetInit,
-                new[]
+                    PropertyAccessor.Set,
+                    new[]
+                    {
+                        GetPropertyAccessor(SyntaxKind.SetAccessorDeclaration)
+                    }
+                },
                 {
-                    GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
-                    GetPropertyAccessor(SyntaxKind.InitAccessorDeclaration)
+                    PropertyAccessor.GetInit,
+                    new[]
+                    {
+                        GetPropertyAccessor(SyntaxKind.GetAccessorDeclaration),
+                        GetPropertyAccessor(SyntaxKind.InitAccessorDeclaration)
+                    }
                 }
-            }
-        };
+            };
 
         private static string ToCamelCase(string pascalCase)
         {
+            if (pascalCase.Length == 0) return pascalCase;
             var stringBuilder = new StringBuilder(pascalCase);
             stringBuilder[0] = char.ToLower(stringBuilder[0]);
             return stringBuilder.ToString();

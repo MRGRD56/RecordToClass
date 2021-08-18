@@ -25,7 +25,7 @@ public record User(
     //blah blah blah
 }".TrimStart());
 
-            Console.WriteLine(record.ToClassString());
+            Console.WriteLine(record.ToClass());
         }
     }
 }

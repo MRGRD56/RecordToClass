@@ -1,6 +1,11 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Input;
+using MgMvvmTools;
+using RecordToClass.Extensions;
 using RecordToClass.Models;
 using RecordToClass.Wpf.Annotations;
 
@@ -12,6 +17,7 @@ namespace RecordToClass.Wpf
         private string _recordText;
         private bool _doUseThisKeyword;
         private bool _doCreateDeconstructor = true;
+        private PropertyAccessor _selectedPropertyAccessor = PropertyAccessor.Get;
         public event PropertyChangedEventHandler PropertyChanged;
 
         public string RecordText
@@ -20,23 +26,38 @@ namespace RecordToClass.Wpf
             set
             {
                 _recordText = value;
+                OnPropertyChanged(nameof(RecordText));
                 UpdateResult();
             }
         }
 
-        private void UpdateResult()
+        private async void UpdateResult()
         {
-            try
+            if (string.IsNullOrWhiteSpace(RecordText))
             {
-                Result = Record.Parse(RecordText)
-                    .ToClassString(
-                        useThisKeyword: DoUseThisKeyword, 
-                        createDeconstructor: DoCreateDeconstructor);
+                Result = RecordText;
+                return;
             }
-            catch (Exception exception)
+            var syncContext = SynchronizationContext.Current;
+            await Task.Run(() =>
             {
-                Result = exception.ToString();
-            }
+                syncContext.Send(() =>
+                {
+                    try
+                    {
+                        Result = Record.Parse(RecordText)
+                            .ToClass(
+                                SelectedPropertyAccessor,
+                                DoUseThisKeyword,
+                                DoCreateDeconstructor)
+                            .ToString();
+                    }
+                    catch (Exception exception)
+                    {
+                        Result = exception.ToString();
+                    }
+                });
+            });
         }
 
         public string Result
@@ -71,6 +92,30 @@ namespace RecordToClass.Wpf
                 UpdateResult();
             }
         }
+
+        public PropertyAccessor[] PropertyAccessors { get; } = Enum.GetValues<PropertyAccessor>();
+
+        public PropertyAccessor SelectedPropertyAccessor
+        {
+            get => _selectedPropertyAccessor;
+            set
+            {
+                if (value == _selectedPropertyAccessor) return;
+                _selectedPropertyAccessor = value;
+                UpdateResult();
+            }
+        }
+
+        public ICommand FormatCommand => new Command(async () =>
+        {
+            try
+            {
+                RecordText = await SyntaxNodeExtensions.FormatCodeAsync(RecordText);
+            }
+            catch
+            {
+            }
+        });
 
         [NotifyPropertyChangedInvocator]
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
