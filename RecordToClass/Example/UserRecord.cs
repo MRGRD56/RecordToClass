@@ -14,9 +14,10 @@ namespace RecordToClass.Records
         bool IsDeleted = false) : IDeletable
     {
         public string GetFullName() => $"{FirstName} {LastName}";
-        
-        //Something {{}}}}}}}
-        
-        //blah blah blah
+
+        public override string ToString()
+        {
+            return $"{Id}, {GetFullName()}";
+        }
     }
 }

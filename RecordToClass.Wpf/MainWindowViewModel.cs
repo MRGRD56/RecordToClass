@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using MgMvvmTools;
 using RecordToClass.Extensions;
@@ -106,7 +107,7 @@ namespace RecordToClass.Wpf
             }
         }
 
-        public ICommand FormatCommand => new Command(async () =>
+        private async Task FormatRecordTextAsync()
         {
             try
             {
@@ -115,7 +116,31 @@ namespace RecordToClass.Wpf
             catch
             {
             }
+        }
+        
+        public ICommand FormatCommand => new Command(async () =>
+        {
+            await FormatRecordTextAsync();
         });
+
+        private async Task PasteRecordAsync()
+        {
+            var text = Clipboard.GetText();
+            if (text == "") return;
+            RecordText = text;
+            await FormatRecordTextAsync();
+        }
+
+        private void CopyClass()
+        {
+            Clipboard.SetText(Result);
+        }
+
+        public ICommand PasteRecordCommand => new Command(async () =>
+        {
+            await PasteRecordAsync();
+        });
+        public ICommand CopyClassCommand => new Command(CopyClass);
 
         [NotifyPropertyChangedInvocator]
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)

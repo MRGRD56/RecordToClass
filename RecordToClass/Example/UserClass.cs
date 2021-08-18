@@ -12,10 +12,9 @@ namespace RecordToClass.Classes
         public string LastName { get; }
         [RegularExpression(@"^(?=.*[A-Za-zА-Яа-яЁё])(?=.*\d).{6,}$")]
         public string Password { get; }
+        public bool IsDeleted { get; }
 
-        public bool IsDeleted { get; } = false;
-    
-        public User(System.Int32 id, string firstName, string lastName, string password, bool isDeleted)
+        public User(System.Int32 id, string firstName, string lastName, string password, bool isDeleted = false)
         {
             Id = id;
             FirstName = firstName;
@@ -24,12 +23,6 @@ namespace RecordToClass.Classes
             IsDeleted = isDeleted;
         }
 
-        public string GetFullName() => $"{FirstName} {LastName}";
-        
-        //Something {{}}}}}}}
-        
-        //blah blah blah
-
         public void Deconstruct(out System.Int32 id, out string firstName, out string lastName, out string password, out bool isDeleted)
         {
             id = Id;
@@ -37,6 +30,13 @@ namespace RecordToClass.Classes
             lastName = LastName;
             password = Password;
             isDeleted = IsDeleted;
+        }
+
+        public string GetFullName() => $"{FirstName} {LastName}";
+
+        public override string ToString()
+        {
+            return $"{Id}, {GetFullName()}";
         }
     }
 }

@@ -14,8 +14,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Orientation="Horizontal">
-            <StackPanel.Resources>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.Resources>
                 <Style TargetType="Control" x:Key="OptionElement">
                     <Setter Property="Margin" Value="3"/>
                     <Setter Property="VerticalAlignment" Value="Center"/>
@@ -23,13 +27,19 @@
                 <Style TargetType="Button" BasedOn="{StaticResource OptionElement}"/>
                 <Style TargetType="CheckBox" BasedOn="{StaticResource OptionElement}"/>
                 <Style TargetType="ComboBox" BasedOn="{StaticResource OptionElement}"/>
-            </StackPanel.Resources>
-            <Button Content="Format" Command="{Binding FormatCommand}"/>
-            <CheckBox IsChecked="{Binding DoUseThisKeyword}" Content="Use 'this' keyword"/>
-            <CheckBox IsChecked="{Binding DoCreateDeconstructor}" Content="Create deconstructor"/>
-            <ComboBox ItemsSource="{Binding PropertyAccessors}"
-                      SelectedItem="{Binding SelectedPropertyAccessor}"/>
-        </StackPanel>
+            </Grid.Resources>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button Content="Format" Command="{Binding FormatCommand}"/>
+                <CheckBox IsChecked="{Binding DoUseThisKeyword}" Content="Use 'this' keyword"/>
+                <CheckBox IsChecked="{Binding DoCreateDeconstructor}" Content="Create deconstructor"/>
+                <ComboBox ItemsSource="{Binding PropertyAccessors}"
+                          SelectedItem="{Binding SelectedPropertyAccessor}"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Paste record" Command="{Binding PasteRecordCommand}"/>
+                <Button Content="Copy class" Command="{Binding CopyClassCommand}"/>
+            </StackPanel>
+        </Grid>
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
